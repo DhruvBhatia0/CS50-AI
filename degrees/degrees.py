@@ -52,10 +52,6 @@ def load_data(directory):
                 pass
 
 
-class PersonNotFound(Exception):
-    pass
-
-
 def main():
     if len(sys.argv) > 2:
         sys.exit("Usage: python degrees.py [directory]")
@@ -65,85 +61,71 @@ def main():
     print("Loading data...")
     load_data(directory)
     print("Data loaded.")
+    while True:
+        source = person_id_for_name(input("Name of source: "))
+        if source is None:
+            sys.exit("Person not found.")
+        target = person_id_for_name(input("Name of target: "))
+        if target is None:
+            sys.exit("Person not found.")
 
-    repeat = True
+        path = shortest_path(source, target)
 
-    while repeat is True:
-        print("\nType in the names you want to search...")
-
-        try:
-            source = person_id_for_name(input("Name: "))
-            if source is None:
-                raise PersonNotFound
-            target = person_id_for_name(input("Name: "))
-            if target is None:
-                raise PersonNotFound
-
-            path = shortest_path(source, target)
-
-            if path is None:
-                print("Not connected.")
-            else:
-                degrees = len(path)
-                print(f"{degrees} degree{'s' if degrees > 1 else ''} of separation.")
-                path = [(None, source)] + path
-                for i in range(degrees):
-                    person1 = people[path[i][1]]["name"]
-                    person2 = people[path[i + 1][1]]["name"]
-                    movie = movies[path[i + 1][0]]["title"]
-                    print(f"{i + 1}: {person1} and {person2} starred in {movie}")
-        except PersonNotFound:
-            print("Person not found.")
-
-        repeat = input("Do you want to search again? (y/n): ").lower().strip()[:1] == "y"
+        if path is None:
+            print("Not connected")
+        else:
+            degrees = len(path)
+            print(f"{degrees} degrees of separation.")
+            path = [(None, source)] + path
+            for i in range(degrees):
+                person1 = people[path[i][1]]["name"]
+                person2 = people[path[i + 1][1]]["name"]
+                movie = movies[path[i + 1][0]]["title"]
+                print(f"{i + 1}: {person1} and {person2} starred in {movie}")
 
 
 def shortest_path(source, target):
     """
     Returns the shortest list of (movie_id, person_id) pairs
     that connect the source to the target.
+
     If no possible path, returns None.
     """
-
-    # Initialize frontier to just the starting position
-    # Our states are people and our actions are movies, which take us from
-    # one actor to another.
-    start = Node(state=source, parent=None, action=None)
-    frontier = QueueFrontier()
+    if source == target:
+        return None
+    
+    num_explored_states = 0
+    start = Node(state = source, parent = None, action = None)
+    frontier = StackFrontier()
     frontier.add(start)
 
-    # Initialize an empty explored set
     explored = set()
 
-    # Keep looping until solution found
     while True:
-
-        # If nothing left in frontier, then no path
         if frontier.empty():
             return None
-
-        # Choose a node from the frontier
+        
         node = frontier.remove()
+        num_explored_states+=1
 
-        # Add neighbors to frontier
-        for action, state in neighbors_for_person(node.state):
-            if not frontier.contains_state(state) and state not in explored:
-                child = Node(state=state, parent=node, action=action)
-
-                # If node is the goal, then we have a solution
-                if child.state == target:
-                    path = []
-                    while child.parent is not None:
-                        path.append((child.action, child.state))
-                        child = child.parent
-                    path.reverse()
-                    return path
-                else:
-                    frontier.add(child)
-
-        # Mark node as explored
         explored.add(node.state)
 
+        for action, state in neighbors_for_person(node.state):
+            if not frontier.contains_state(state) and state not in explored:
+                child = Node(state = state, parent = node, action = action)
+
+                if child.state == target:
+                    movie_list = []
+                    people_path = []
+                    while child.parent is not None:
+                        movie_list.append(child.action)
+                        people_path.append(child.state)
+                        child = child.parent
+                    movie_list.reverse()
+                    people_path.reverse()
+                    return list(zip(movie_list,people_path))
+
+                frontier.add(child)
 
 def person_id_for_name(name):
     """
